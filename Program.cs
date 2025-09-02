@@ -1,10 +1,16 @@
+using Microsoft.EntityFrameworkCore;
 using minimal_api.Dominio.DTOs;
+using minimal_api.Infraestrutura.Db;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddDbContext<Contexto>
+    (
+         options => options.UseMySql(builder.Configuration.GetConnectionString("mysql"), 
+            ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("mysql")))
+    );
+
 
 var app = builder.Build();
 

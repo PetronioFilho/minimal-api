@@ -1,0 +1,9 @@
+﻿Migrations Commands
+
+1º Criar um arquivo migration que será usado para criar a tabela no banco de dados
+
+	Add-Migration <Nome do Migration> -Context <Classe de Context>
+
+2º Atualizar o banco de dados com base na classe Context
+
+	Update-Database -Context <Classe Context>
