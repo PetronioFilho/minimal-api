@@ -7,3 +7,9 @@
 2º Atualizar o banco de dados com base na classe Context
 
 	Update-Database -Context <Classe Context>
+
+3º Inserir dados na tabela via Seed
+	1 - Add-Migration <SeedAdministrador> -Context Contexto
+	2 - Update-Database -Context <SeuContexto>
+	
+	OBS: O comando 1 cria o migration mas não altera o banco de dados, o comando 2 atualiza o banco de dados com base no migration criado.
