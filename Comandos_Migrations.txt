@@ -1,6 +1,7 @@
 ﻿Migrations Commands
 
 1º Criar um arquivo migration que será usado para criar a tabela no banco de dados
+OBS: Esse comando cria o arquivo migration mas não altera o banco de dados
 
 	Add-Migration <Nome do Migration> -Context <Classe de Context>
 
