@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using minimal_api.Dominio.DTOs;
@@ -18,6 +19,14 @@ builder.Services.AddDbContext<Contexto>
 
 
 var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.UseSwaggerUI(options =>
+    options.SwaggerEndpoint("/openapi/v1.json", "Veiculos API"));
+}
 
 app.MapGet("/", () => "Hello World");
 
