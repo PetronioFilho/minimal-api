@@ -47,6 +47,55 @@ app.MapGet("/", () => Results.Json(new Home())).WithTags("Home");
 
 #region Administradores
 
+app.MapPost("/administradores/cadastrar", ([FromBody] AdministradorDTO administradorDTO, IAdministradorServico administradorServico) =>
+{
+    var validacao = new ErrosDeValidacao
+    {
+        Mensagens = new List<string>()
+    };
+
+    var administrador = ValidaAdministrador(validacao, administradorDTO);
+
+    if (validacao.Mensagens.Count > 0)
+        return Results.BadRequest(validacao);
+    else
+    {
+        administradorServico.Cadastrar(administrador);
+    }
+
+    return Results.Created($"/administradores/{administrador.Id}", administrador);
+
+}).WithTags("Adminstrador");
+
+Administrador ValidaAdministrador(ErrosDeValidacao validacao, AdministradorDTO administradorDTO)
+{
+    var administrador = new Administrador();
+
+    if (string.IsNullOrEmpty(administradorDTO.Email))
+        validacao.Mensagens.Add("O email do administrador não pode ser vazio");
+    if (string.IsNullOrEmpty(administradorDTO.Senha))
+        validacao.Mensagens.Add("A senha do administrador não pode ser vazia");
+    if (administradorDTO.Perfil == 0)
+        validacao.Mensagens.Add("O perfil do administrador deve ser informado");
+
+    if (validacao.Mensagens.Count == 0)
+    {
+        administrador.Email = administradorDTO.Email;
+        administrador.Senha = administradorDTO.Senha;
+        administrador.Perfil = administradorDTO.Perfil.ToString();
+    }
+
+    return administrador;
+}
+
+app.MapPost("/administradores/todos", ([FromQuery] int? pagina, IAdministradorServico administradorServico) =>
+{
+    var administradores = administradorServico.Todos(pagina);
+    return Results.Ok(administradores);
+
+}).WithTags("Adminstrador");
+
+
 app.MapPost("/administradores/login", ([FromBody] LoginDTO loginDTO, IAdministradorServico administradorServico) =>
 {
     if (administradorServico.Login(loginDTO) != null)
@@ -58,6 +107,40 @@ app.MapPost("/administradores/login", ([FromBody] LoginDTO loginDTO, IAdministra
         return Results.Unauthorized();
     }
 }).WithTags("Adminstrador");
+
+
+app.MapGet("/administradores/{id}", ([FromRoute] int id, IAdministradorServico administradorServico) =>
+{
+    var admin = administradorServico.BuscaPorId(id);
+    if (admin != null)
+    {
+        return Results.Ok(admin);
+    }
+    else
+    {
+        return Results.NotFound();
+    }
+
+}).WithTags("Adminstrador");
+
+app.MapPut("/administradores/{id}", ([FromRoute] int id, AdministradorDTO administradorDTO, IAdministradorServico administradorServico) =>
+{
+    var admin = administradorServico.BuscaPorId(id);
+    if (admin != null)
+    {
+        admin.Senha = administradorDTO.Senha;
+        admin.Email = administradorDTO.Email;
+        admin.Perfil = administradorDTO.Perfil.ToString();
+
+        administradorServico.Atualizar(admin);
+
+        return Results.Ok(admin);
+    }
+    else
+    {
+        return Results.NotFound();
+    }
+}).WithTags("Veículo");
 
 #endregion
 
@@ -72,7 +155,7 @@ app.MapPost("/veiculos", ([FromBody] VeiculoDTO veiculoDTO, IVeiculoServico veic
 
     ValidaModelo(mensagens, veiculoDTO);
 
-    if(mensagens.Mensagens.Count > 0)
+    if (mensagens.Mensagens.Count > 0)
         return Results.BadRequest(mensagens);
 
     var veiculo = new Veiculo
@@ -124,7 +207,8 @@ app.MapGet("/veiculos/{id}", ([FromRoute] int id, IVeiculoServico veiculoServico
 
 }).WithTags("Veiculo");
 
-app.MapPut("/veiculos/{id}", ([FromRoute] int id, VeiculoDTO veiculoDTO, IVeiculoServico veiculoServico) => {
+app.MapPut("/veiculos/{id}", ([FromRoute] int id, VeiculoDTO veiculoDTO, IVeiculoServico veiculoServico) =>
+{
     var veiculo = veiculoServico.BuscaPorId(id);
     if (veiculo != null)
     {
@@ -140,7 +224,8 @@ app.MapPut("/veiculos/{id}", ([FromRoute] int id, VeiculoDTO veiculoDTO, IVeicul
     }
 }).WithTags("Veículo");
 
-app.MapDelete("/veiculos/{id}", ([FromRoute] int id, IVeiculoServico veiculoServico) => {
+app.MapDelete("/veiculos/{id}", ([FromRoute] int id, IVeiculoServico veiculoServico) =>
+{
     var veiculo = veiculoServico.BuscaPorId(id);
     if (veiculo != null)
     {
