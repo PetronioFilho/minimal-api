@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using minimal_api.Dominio.DTOs;
 using minimal_api.Dominio.Entidades;
 using minimal_api.Dominio.Interfaces;
+using minimal_api.Dominio.ModelViews;
 using minimal_api.Dominio.Servicos;
 using minimal_api.Infraestrutura.Db;
 
@@ -38,6 +39,11 @@ if (app.Environment.IsDevelopment())
 
 #endregion
 
+#region Home
+
+app.MapGet("/", () => Results.Json(new Home())).WithTags("Home");
+
+#endregion
 
 #region Administradores
 
@@ -51,7 +57,7 @@ app.MapPost("/administradores/login", ([FromBody] LoginDTO loginDTO, IAdministra
     {
         return Results.Unauthorized();
     }
-});
+}).WithTags("Adminstrador");
 
 #endregion
 
@@ -68,12 +74,12 @@ app.MapPost("/veiculos", ([FromBody] VeiculoDTO veiculoDTO, IVeiculoServico veic
     veiculoServico.Incluir(veiculo);
 
     return Results.Created($"/veiculos/{veiculo.Id}", veiculo);
-});
+}).WithTags("Veiculo");
 
 app.MapGet("/veiculos", ([FromQuery] int? pagina, IVeiculoServico veiculoServico) => {
     var veiculos = veiculoServico.Todos(pagina);
     return Results.Ok(veiculos);
-});
+}).WithTags("Veiculo");
 
 #endregion
 
