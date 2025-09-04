@@ -65,6 +65,16 @@ app.MapPost("/administradores/login", ([FromBody] LoginDTO loginDTO, IAdministra
 
 app.MapPost("/veiculos", ([FromBody] VeiculoDTO veiculoDTO, IVeiculoServico veiculoServico) =>
 {
+    var mensagens = new ErrosDeValidacao
+    {
+        Mensagens = new List<string>()
+    };
+
+    ValidaModelo(mensagens, veiculoDTO);
+
+    if(mensagens.Mensagens.Count > 0)
+        return Results.BadRequest(mensagens);
+
     var veiculo = new Veiculo
     {
         Nome = veiculoDTO.Nome,
@@ -74,7 +84,24 @@ app.MapPost("/veiculos", ([FromBody] VeiculoDTO veiculoDTO, IVeiculoServico veic
     veiculoServico.Incluir(veiculo);
 
     return Results.Created($"/veiculos/{veiculo.Id}", veiculo);
+
 }).WithTags("Veiculo");
+
+void ValidaModelo(ErrosDeValidacao mensagens, VeiculoDTO veiculoDTO)
+{
+    if (string.IsNullOrEmpty(veiculoDTO.Nome))
+    {
+        mensagens.Mensagens.Add("O nome do veículo não pode ser vazio");
+    }
+    else if (string.IsNullOrEmpty(veiculoDTO.Marca))
+    {
+        mensagens.Mensagens.Add("O nome da marca não pode ser vazio");
+    }
+    else if (veiculoDTO.Ano == 0)
+    {
+        mensagens.Mensagens.Add("Informar o ano do veiculo");
+    }
+}
 
 app.MapGet("/veiculos", ([FromQuery] int? pagina, IVeiculoServico veiculoServico) =>
 {
