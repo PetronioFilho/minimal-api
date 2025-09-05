@@ -1,11 +1,16 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using minimal_api.Dominio.DTOs;
 using minimal_api.Dominio.Entidades;
 using minimal_api.Dominio.Interfaces;
 using minimal_api.Dominio.ModelViews;
 using minimal_api.Dominio.Servicos;
 using minimal_api.Infraestrutura.Db;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 #region Builder
 
@@ -13,8 +18,44 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped<IAdministradorServico, AdministradorServico>();
 builder.Services.AddScoped<IVeiculoServico, VeiculoServico>();
+var key = builder.Configuration["Jwt"];
+if(string.IsNullOrEmpty(key)) key = "EssaChaveDeveSerTrocadaEmProducao";
+
+// Configuração do sistema de autenticação JWT
+
+//Este método adiciona os serviços fundamentais de autenticação ao container de injeção de dependência da aplicação.
+//É o primeiro e essencial passo para habilitar a autenticação.
+builder.Services.AddAuthentication(option => {
+
+    //Esta linha define o esquema de autenticação padrão para o processo de "Autenticação".
+    //Isso significa que, quando a aplicação precisar autenticar um usuário (por exemplo, ao acessar uma rota protegida),
+    //ela usará o esquema especificado aqui. No caso, está sendo definido como JwtBearerDefaults.AuthenticationScheme,
+    //que é o esquema de autenticação baseado em tokens JWT (JSON Web Tokens). Esse esquema é amplamente utilizado para autenticação em APIs,
+    //onde o cliente envia um token JWT no cabeçalho da requisição para provar sua identidade.
+    option.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+
+    //Esta linha define o esquema de autenticação padrão para o processo de "Desafio" (Challenge).
+    //O desafio ocorre quando um usuário tenta acessar um recurso protegido sem estar autenticado.
+    //Ao definir o DefaultChallengeScheme como JwtBearerDefaults.AuthenticationScheme, a aplicação está especificando que,
+    //quando um usuário não autenticado tenta acessar um recurso protegido, o sistema de autenticação deve usar o esquema JWT Bearer
+    //para desafiar o usuário a fornecer um token JWT válido para autenticação.
+    option.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 
 
+    //O método .AddJwtBearer() configura o esquema de autenticação "Bearer" que foi definido como padrão no AddAuthentication.
+    //Dentro dele, você cria um objeto TokenValidationParameters que age como a "lista de verificações" para cada token que chega.
+}).AddJwtBearer(option =>
+{
+    //Esses parâmetros dizem ao sistema como validar os tokens JWT recebidos.
+    option.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+    {
+        ValidateLifetime = true,
+        ValidateAudience = true,
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(key))
+    };
+});
+
+builder.Services.AddAuthorization();
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<Contexto>
     (
@@ -23,7 +64,6 @@ builder.Services.AddDbContext<Contexto>
     );
 
 #endregion
-
 
 #region App
 
@@ -65,7 +105,7 @@ app.MapPost("/administradores/cadastrar", ([FromBody] AdministradorDTO administr
 
     return Results.Created($"/administradores/{administrador.Id}", administrador);
 
-}).WithTags("Adminstrador");
+}).RequireAuthorization().WithTags("Adminstrador");
 
 Administrador ValidaAdministrador(ErrosDeValidacao validacao, AdministradorDTO administradorDTO)
 {
@@ -93,14 +133,44 @@ app.MapPost("/administradores/todos", ([FromQuery] int? pagina, IAdministradorSe
     var administradores = administradorServico.Todos(pagina);
     return Results.Ok(administradores);
 
-}).WithTags("Adminstrador");
+}).RequireAuthorization().WithTags("Adminstrador");
 
+string gerarTokenJwt(Administrador administrador)
+{
+    if(!string.IsNullOrEmpty(key))
+    {
+        var secutiryKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+        var credentials = new SigningCredentials(secutiryKey, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>()
+        {
+            new Claim(ClaimTypes.Email, administrador.Email),
+            new Claim("Perfil", administrador.Perfil)
+        };
+
+        var token = new JwtSecurityToken(
+            claims: claims,
+            expires: DateTime.Now.AddMinutes(120),
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+    return string.Empty;
+}
 
 app.MapPost("/administradores/login", ([FromBody] LoginDTO loginDTO, IAdministradorServico administradorServico) =>
 {
-    if (administradorServico.Login(loginDTO) != null)
+    var admin = administradorServico.Login(loginDTO);
+    if (admin != null)
     {
-        return Results.Ok("Login com sucesso");
+        string token = gerarTokenJwt(admin);
+        return Results.Ok(new AdminLogadoModelView 
+        {
+            Id = admin.Id,
+            Email = admin.Email,
+            Token = token
+        });
     }
     else
     {
@@ -121,7 +191,7 @@ app.MapGet("/administradores/{id}", ([FromRoute] int id, IAdministradorServico a
         return Results.NotFound();
     }
 
-}).WithTags("Adminstrador");
+}).RequireAuthorization().WithTags("Adminstrador");
 
 app.MapPut("/administradores/{id}", ([FromRoute] int id, AdministradorDTO administradorDTO, IAdministradorServico administradorServico) =>
 {
@@ -140,7 +210,7 @@ app.MapPut("/administradores/{id}", ([FromRoute] int id, AdministradorDTO admini
     {
         return Results.NotFound();
     }
-}).WithTags("Veículo");
+}).RequireAuthorization().WithTags("Adminstrador");
 
 #endregion
 
@@ -168,7 +238,7 @@ app.MapPost("/veiculos", ([FromBody] VeiculoDTO veiculoDTO, IVeiculoServico veic
 
     return Results.Created($"/veiculos/{veiculo.Id}", veiculo);
 
-}).WithTags("Veiculo");
+}).RequireAuthorization().WithTags("Veiculo");
 
 void ValidaModelo(ErrosDeValidacao mensagens, VeiculoDTO veiculoDTO)
 {
@@ -190,7 +260,7 @@ app.MapGet("/veiculos", ([FromQuery] int? pagina, IVeiculoServico veiculoServico
 {
     var veiculos = veiculoServico.Todos(pagina);
     return Results.Ok(veiculos);
-}).WithTags("Veiculo");
+}).RequireAuthorization().WithTags("Veiculo");
 
 
 app.MapGet("/veiculos/{id}", ([FromRoute] int id, IVeiculoServico veiculoServico) =>
@@ -205,7 +275,7 @@ app.MapGet("/veiculos/{id}", ([FromRoute] int id, IVeiculoServico veiculoServico
         return Results.NotFound();
     }
 
-}).WithTags("Veiculo");
+}).RequireAuthorization().WithTags("Veiculo");
 
 app.MapPut("/veiculos/{id}", ([FromRoute] int id, VeiculoDTO veiculoDTO, IVeiculoServico veiculoServico) =>
 {
@@ -222,7 +292,7 @@ app.MapPut("/veiculos/{id}", ([FromRoute] int id, VeiculoDTO veiculoDTO, IVeicul
     {
         return Results.NotFound();
     }
-}).WithTags("Veículo");
+}).RequireAuthorization().WithTags("Veículo");
 
 app.MapDelete("/veiculos/{id}", ([FromRoute] int id, IVeiculoServico veiculoServico) =>
 {
@@ -237,8 +307,11 @@ app.MapDelete("/veiculos/{id}", ([FromRoute] int id, IVeiculoServico veiculoServ
     {
         return Results.NotFound();
     }
-}).WithTags("Veículo");
+}).RequireAuthorization().WithTags("Veículo");
 
 #endregion
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.Run();
